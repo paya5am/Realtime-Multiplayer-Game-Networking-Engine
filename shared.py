@@ -1,15 +1,34 @@
-import json
 import random
 import time
 from config import PACKET_LOSS_SIMULATION, LATENCY_SIMULATION
 
 
-def encode_packet(data):
-    return json.dumps(data).encode()
+def encode_move(pid, dx, dy, seq, key):
+    return f"MOVE|{pid}|{dx}|{dy}|{seq}|{key}".encode()
+
+
+def encode_state(players, key):
+    # players: {id: {x,y,r,g,b}}
+    parts = ["STATE"]
+    for pid, p in players.items():
+        parts.append(f"{pid},{p['x']},{p['y']},{p['r']},{p['g']},{p['b']}")
+    parts.append(key)
+    return "|".join(parts).encode()
+
+
+def encode_ping(ts, key):
+    return f"PING|{ts}|{key}".encode()
+
+
+def encode_pong(ts, key):
+    return f"PONG|{ts}|{key}".encode()
 
 
 def decode_packet(data):
-    return json.loads(data.decode())
+    try:
+        return data.decode().split("|")
+    except:
+        return None
 
 
 def simulate_network():
