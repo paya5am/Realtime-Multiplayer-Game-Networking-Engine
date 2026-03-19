@@ -23,8 +23,8 @@ SECURITY_KEY = "secure123"
 CLIENT_UPDATE_RATE = 0.05 
 SERVER_BROADCAST_RATE = 0.05 
 
-PACKET_LOSS_SIMULATION = 0.5  # Simulated packet loss (0.0 to 1.0)
-LATENCY_SIMULATION = 0.5     # Simulated latency in seconds
+PACKET_LOSS_SIMULATION = 0.0  # Simulated packet loss (0.0 to 1.0)
+LATENCY_SIMULATION = 0.0     # Simulated latency in seconds
 JITTER_SIMULATION = 0.1       # Maximum jitter in seconds
 
 MOVE_SPEED = 10

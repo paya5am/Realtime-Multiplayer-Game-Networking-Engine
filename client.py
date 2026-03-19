@@ -138,6 +138,7 @@ players = {}
 latency = 0
 latency_history = []  # ADDED
 seq = 0
+jitter = 0  # ADDED: global jitter variable
 
 pygame.init()
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -148,24 +149,24 @@ player_y = 100
 lock = threading.Lock()
 
 def ssl_handshake():
-    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)  # CHANGED
-    context.check_hostname = False  # Optional for self-signed cert
-    context.verify_mode = ssl.CERT_REQUIRED  # CHANGED
-    context.load_verify_locations(cafile=SSL_CERTFILE)  # CHANGED: use server.pem to verify
+    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_REQUIRED
+    context.load_verify_locations(cafile=SSL_CERTFILE)
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     secure_sock = context.wrap_socket(s, server_hostname=SERVER_IP)
     try:
         secure_sock.connect((SERVER_IP, HANDSHAKE_PORT))
-        print("SSL handshake done and server verified")  # CHANGED
+        print("SSL handshake done and server verified")
         secure_sock.close()
     except ssl.SSLError as e:
-        print("SSL handshake failed:", e)  # CHANGED
+        print("SSL handshake failed:", e)
     except Exception as e:
-        print("Connection failed:", e)  # CHANGED
+        print("Connection failed:", e)
 
 def receive_loop():
-    global latency, players, latency_history
+    global latency, players, latency_history, jitter  # CHANGED
     while True:
         data, _ = sock.recvfrom(4096)
         if not simulate_network():
@@ -192,11 +193,11 @@ def receive_loop():
                     players = new_players
             elif ptype == "PONG":
                 rtt = (time.time() - float(packet[1])) * 1000
-                latency_history.append(rtt)  # ADDED
+                latency_history.append(rtt)
                 if len(latency_history) > 50:
                     latency_history.pop(0)
                 latency = sum(latency_history) / len(latency_history)
-                jitter = calculate_jitter(latency_history)  # ADDED
+                jitter = calculate_jitter(latency_history)  # CHANGED
         except:
             print("Bad packet")
 
@@ -256,9 +257,8 @@ while running:
     latency_text = font.render(f"Latency: {int(latency)} ms", True, (255, 255, 255))
     screen.blit(latency_text, (10, 10))
     # Display jitter
-    if 'jitter' in locals():  # ADDED
-        jitter_text = font.render(f"Jitter: {int(jitter)} ms", True, (255, 255, 0))
-        screen.blit(jitter_text, (10, 30))
+    jitter_text = font.render(f"Jitter: {int(jitter)} ms", True, (255, 255, 0))  # CHANGED
+    screen.blit(jitter_text, (10, 30))
     pygame.display.flip()
     clock.tick(60)
 

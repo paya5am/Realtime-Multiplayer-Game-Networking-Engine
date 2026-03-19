@@ -97,15 +97,15 @@ import ssl
 from config import *
 from shared import *
 
-# Proper socket cleanup
 server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # CHANGED
+server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind((SERVER_IP, SERVER_PORT))
 print("UDP Server started")
 
 clients = {}
 players = {}
 lock = threading.Lock()
+client_last_active = {}  # ADDED: track last packet time per client
 
 COLORS = [
     (255, 0, 0),
@@ -117,10 +117,10 @@ COLORS = [
 ]
 
 def ssl_handshake_server():
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)  # CHANGED
-    context.load_cert_chain(certfile=SSL_CERTFILE, keyfile=SSL_KEYFILE)  # CHANGED
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(certfile=SSL_CERTFILE, keyfile=SSL_KEYFILE)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # CHANGED
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind((SERVER_IP, HANDSHAKE_PORT))
     s.listen(5)
     print("SSL Handshake server running")
@@ -143,7 +143,6 @@ def handle_packets():
             continue
         try:
             ptype = packet[0]
-            # SECURITY CHECK
             if packet[-1] != SECURITY_KEY:
                 continue
             with lock:
@@ -160,6 +159,7 @@ def handle_packets():
                     }
                     print("New client:", pid)
                 pid = clients[addr]
+                client_last_active[addr] = time.time()  # ADDED: update last active
             if ptype == "MOVE":
                 dx = int(packet[2])
                 dy = int(packet[3])
@@ -180,9 +180,23 @@ def broadcast_state():
             for addr in clients:
                 server.sendto(packet, addr)
 
+# Cleanup inactive clients
+def cleanup_clients(timeout=5):  # ADDED
+    while True:
+        time.sleep(1)
+        with lock:
+            to_remove = [addr for addr, last in client_last_active.items()
+                         if time.time() - last > timeout]
+            for addr in to_remove:
+                pid = clients.pop(addr)
+                players.pop(pid, None)
+                client_last_active.pop(addr, None)
+                print(f"Client {pid} removed due to timeout")  # ADDED
+
 threading.Thread(target=handle_packets, daemon=True).start()
 threading.Thread(target=broadcast_state, daemon=True).start()
-threading.Thread(target=ssl_handshake_server, daemon=True).start()  # ADDED
+threading.Thread(target=ssl_handshake_server, daemon=True).start()
+threading.Thread(target=cleanup_clients, daemon=True).start()  # ADDED
 
 while True:
     time.sleep(1)
