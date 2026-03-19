@@ -1,17 +1,20 @@
 import socket
 import threading
 import time
-import ssl 
+import ssl
+import secrets
 from config import *
 from shared import *
 
 server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 server.bind((SERVER_IP, SERVER_PORT))
-
 print("UDP Server started")
 
-clients = {}
-players = {}
+clients = {}       # addr -> pid
+players = {}       # pid -> state
+last_seen = {}     # addr -> timestamp
+last_seq = {}      # pid -> last seq
+session_keys = {}  # addr -> session key
 
 lock = threading.Lock()
 
@@ -28,83 +31,90 @@ def ssl_handshake_server():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((SERVER_IP, HANDSHAKE_PORT))
     s.listen(5)
-
     print("SSL Handshake server running")
 
     while True:
         conn, addr = s.accept()
         secure_conn = context.wrap_socket(conn, server_side=True)
-        print("Secure handshake with", addr)
+        session_key = secrets.token_hex(16)
+        session_keys[addr] = session_key
+        print(f"Secure handshake with {addr}, session key: {session_key}")
+        secure_conn.send(session_key.encode())
         secure_conn.close()
-
 
 def handle_packets():
     while True:
         data, addr = server.recvfrom(4096)
-
         if not simulate_network():
             continue
-
         packet = decode_packet(data)
         if not packet:
             continue
-
         try:
             ptype = packet[0]
-
-            # SECURITY CHECK
-            if packet[-1] != SECURITY_KEY:
-                continue
-
             with lock:
-
                 if addr not in clients:
                     pid = str(len(clients) + 1)
                     color = COLORS[len(clients) % len(COLORS)]
-
                     clients[addr] = pid
-                    players[pid] = {
-                        "x": 100,
-                        "y": 100,
-                        "r": color[0],
-                        "g": color[1],
-                        "b": color[2],
-                    }
-
+                    players[pid] = {"x": 100, "y": 100, "r": color[0], "g": color[1], "b": color[2]}
+                    last_seq[pid] = -1
                     print("New client:", pid)
+                # security check
+                if addr not in session_keys or packet[-1] != session_keys[addr]:
+                    continue
 
                 pid = clients[addr]
+                last_seen[addr] = time.time()
 
                 if ptype == "MOVE":
+                    seq_num = int(packet[4])
+                    if seq_num <= last_seq[pid]:
+                        continue
+                    last_seq[pid] = seq_num
+
                     dx = int(packet[2])
                     dy = int(packet[3])
-
                     players[pid]["x"] += dx
                     players[pid]["y"] += dy
 
                 elif ptype == "PING":
                     ts = packet[1]
-                    pong = encode_pong(ts, SECURITY_KEY)
+                    pong = encode_pong(ts, session_keys[addr])
                     server.sendto(pong, addr)
 
         except:
             print("Malformed packet ignored")
 
-
 def broadcast_state():
     while True:
         time.sleep(SERVER_BROADCAST_RATE)
-
         with lock:
-            packet = encode_state(players, SECURITY_KEY)
-
+            packet = encode_state(players, session_keys.get(next(iter(clients), None), SECURITY_KEY))
             for addr in clients:
-                server.sendto(packet, addr)
+                key = session_keys.get(addr)
+                if key:
+                    packet = encode_state(players, key)
+                    server.sendto(packet, addr)
 
+def cleanup_clients():
+    while True:
+        time.sleep(5)
+        with lock:
+            now = time.time()
+            remove_addrs = [addr for addr, ts in last_seen.items() if now - ts > 10]
+            for addr in remove_addrs:
+                pid = clients.pop(addr)
+                players.pop(pid)
+                last_seq.pop(pid)
+                session_keys.pop(addr)
+                last_seen.pop(addr)
+                print(f"Client {pid} removed due to timeout")
 
 threading.Thread(target=handle_packets, daemon=True).start()
 threading.Thread(target=broadcast_state, daemon=True).start()
-threading.Thread(target=ssl_handshake_server, daemon=True).start()  # NEW
+threading.Thread(target=ssl_handshake_server, daemon=True).start()
+threading.Thread(target=cleanup_clients, daemon=True).start()
 
 while True:
     time.sleep(1)
