@@ -14,7 +14,7 @@ print("UDP Server started")
 clients = {}
 players = {}
 lock = threading.Lock()
-client_last_active = {}  #track last packet time per client
+client_last_active = {}  #packet time per client
 
 COLORS = [
     (255, 0, 0),
@@ -68,7 +68,7 @@ def handle_packets():
                     }
                     print("New client:", pid)
                 pid = clients[addr]
-                client_last_active[addr] = time.time()  #update last active
+                client_last_active[addr] = time.time()  #last active
             if ptype == "MOVE":
                 dx = int(packet[2])
                 dy = int(packet[3])

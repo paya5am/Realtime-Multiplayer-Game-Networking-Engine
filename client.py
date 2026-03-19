@@ -1,4 +1,3 @@
-
 import socket
 import threading
 import time
@@ -14,7 +13,7 @@ players = {}
 latency = 0
 latency_history = [] 
 seq = 0
-jitter = 0  #global jitter variable
+jitter = 0  # global jitter variable
 
 pygame.init()
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -23,6 +22,12 @@ font = pygame.font.SysFont(None, 24)
 player_x = 100
 player_y = 100
 lock = threading.Lock()
+
+# -----------------client prediction -----------------
+def smooth_move(local, server, alpha=0.5):
+    """Blend local predicted position toward server position"""
+    return local * (1 - alpha) + server * alpha
+# ----------------------------------------------------
 
 def ssl_handshake():
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
@@ -73,7 +78,7 @@ def receive_loop():
                 if len(latency_history) > 50:
                     latency_history.pop(0)
                 latency = sum(latency_history) / len(latency_history)
-                jitter = calculate_jitter(latency_history) 
+                jitter = calculate_jitter(latency_history)
         except:
             print("Bad packet")
 
@@ -123,16 +128,23 @@ while running:
     screen.fill((30, 30, 30))
     with lock:
         for pid, p in players.items():
+            # -----------------prediction-----------------
+            if pid == "0":
+                p_x = smooth_move(player_x, p["x"])
+                p_y = smooth_move(player_y, p["y"])
+            else:
+                p_x = p["x"]
+                p_y = p["y"]
+            # ---------------------------------------------
             pygame.draw.rect(
                 screen,
                 (p["r"], p["g"], p["b"]),
-                (p["x"], p["y"], PLAYER_SIZE, PLAYER_SIZE),
+                (p_x, p_y, PLAYER_SIZE, PLAYER_SIZE),
             )
             text = font.render(pid, True, (255, 255, 255))
-            screen.blit(text, (p["x"], p["y"] - 15))
+            screen.blit(text, (p_x, p_y - 15))
     latency_text = font.render(f"Latency: {int(latency)} ms", True, (255, 255, 255))
     screen.blit(latency_text, (10, 10))
-    # Display jitter
     jitter_text = font.render(f"Jitter: {int(jitter)} ms", True, (255, 255, 0)) 
     screen.blit(jitter_text, (10, 30))
     pygame.display.flip()
