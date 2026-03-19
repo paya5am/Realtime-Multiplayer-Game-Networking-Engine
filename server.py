@@ -58,7 +58,6 @@ def handle_packets():
         try:
             ptype = packet[0]
             with lock:
-                # First connection: assign pid
                 if addr not in clients:
                     pid = str(len(clients) + 1)
                     color = COLORS[len(clients) % len(COLORS)]
@@ -89,8 +88,8 @@ def handle_packets():
                     pong = encode_pong(ts, session_keys[addr])
                     server.sendto(pong, addr)
 
-        except Exception as e:
-            print("Malformed packet ignored:", e)
+        except:
+            print("Malformed packet ignored")
 
 def broadcast_state():
     while True:
@@ -116,6 +115,7 @@ def cleanup_clients():
                 last_seen.pop(addr)
                 print(f"Client {pid} removed due to timeout")
 
+# start threads
 threading.Thread(target=handle_packets, daemon=True).start()
 threading.Thread(target=broadcast_state, daemon=True).start()
 threading.Thread(target=ssl_handshake_server, daemon=True).start()

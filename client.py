@@ -2,7 +2,7 @@ import socket
 import threading
 import time
 import pygame
-import ssl  
+import ssl
 from config import *
 from shared import *
 
@@ -14,14 +14,11 @@ latency = 0
 last_latency = None
 jitter = 0
 seq = 0
-pid = None  # <- store your assigned pid
+pid = None  # your player id
 
 pygame.init()
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 font = pygame.font.SysFont(None, 24)
-
-player_x = 100
-player_y = 100
 
 lock = threading.Lock()
 
@@ -60,9 +57,13 @@ def receive_loop():
                     p_id, x, y, r, g, b = p.split(",")
                     new_players[p_id] = {"x": int(x), "y": int(y), "r": int(r), "g": int(g), "b": int(b)}
                 with lock:
-                    players = new_players
-                    # grab your assigned pid if not set
-                    if pid is None and str(len(players)) == "1":
+                    # Preserve local predicted position for this client
+                    if pid in players:
+                        new_players[pid]['x'] = players[pid]['x']
+                        new_players[pid]['y'] = players[pid]['y']
+                    players.update(new_players)
+                    # Grab your assigned pid if not known
+                    if pid is None and len(players) > 0:
                         pid = next(iter(players))
             elif ptype == "PONG":
                 current_latency = (time.time() - float(packet[1])) * 1000
@@ -107,9 +108,13 @@ while running:
     if keys[pygame.K_d]: dx = MOVE_SPEED
     if keys[pygame.K_q]: running = False
 
-    if dx or dy:
-        player_x += dx
-        player_y += dy
+    if pid is not None and (dx != 0 or dy != 0):
+        # client-side prediction
+        with lock:
+            if pid not in players:
+                players[pid] = {"x": 100, "y": 100, "r": 255, "g": 0, "b": 0}
+            players[pid]['x'] += dx
+            players[pid]['y'] += dy
         send_move(dx, dy)
 
     screen.fill((30, 30, 30))
