@@ -1,5 +1,5 @@
 
-SERVER_IP = "192.168.226.47"  # Listen on all interfaces
+SERVER_IP = "0.0.0.0"  # Listen on all interfaces
 SERVER_PORT = 9999
 HANDSHAKE_PORT = 9998
 SECURITY_KEY = "secure123"
