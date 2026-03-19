@@ -27,6 +27,7 @@ def decode_packet(data):
 def simulate_network():
     if random.random() < PACKET_LOSS_SIMULATION:
         return False
+        
     if LATENCY_SIMULATION > 0 or JITTER_SIMULATION > 0:
         base = LATENCY_SIMULATION
         jitter = random.uniform(-JITTER_SIMULATION, JITTER_SIMULATION)

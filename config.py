@@ -4,7 +4,7 @@ HANDSHAKE_PORT = 9998
 SECURITY_KEY = "secure123"   # will be replaced with session key after SSL handshake
 
 CLIENT_UPDATE_RATE = 0.05
-SERVER_BROADCAST_RATE = 0.05   # 1/updates
+SERVER_BROADCAST_RATE = 0.05   
 
 PACKET_LOSS_SIMULATION = 0.0
 LATENCY_SIMULATION = 0.0
