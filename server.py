@@ -39,26 +39,13 @@ def ssl_handshake_server():
         try:
             secure_conn = context.wrap_socket(conn, server_side=True)
             session_key = secrets.token_hex(16)
-            with lock:
-                session_keys[addr] = session_key
-
-                # Immediately add player to players dict for immediate STATE broadcast
-                if addr not in clients:
-                    pid = str(len(clients) + 1)
-                    color = COLORS[len(clients) % len(COLORS)]
-                    clients[addr] = pid
-                    players[pid] = {"x": 100, "y": 100, "r": color[0], "g": color[1], "b": color[2]}
-                    last_seq[pid] = -1
-                    last_seen[addr] = time.time()
-                    print("New client:", pid)
-
-            secure_conn.send(session_key.encode())
+            session_keys[addr] = session_key
             print(f"Secure handshake with {addr}, session key: {session_key}")
+            secure_conn.send(session_key.encode())
         except ssl.SSLError as e:
             print(f"SSL handshake failed with {addr}: {e}")
         finally:
             conn.close()
-
 
 def handle_packets():
     while True:
@@ -71,10 +58,16 @@ def handle_packets():
         try:
             ptype = packet[0]
             with lock:
+                # First connection: assign pid
                 if addr not in clients:
-                    continue  # ignore moves from unknown clients
+                    pid = str(len(clients) + 1)
+                    color = COLORS[len(clients) % len(COLORS)]
+                    clients[addr] = pid
+                    players[pid] = {"x": 100, "y": 100, "r": color[0], "g": color[1], "b": color[2]}
+                    last_seq[pid] = -1
+                    print("New client:", pid)
 
-                # Security check
+                # security check
                 if addr not in session_keys or packet[-1] != session_keys[addr]:
                     continue
 
@@ -86,7 +79,6 @@ def handle_packets():
                     if seq_num <= last_seq[pid]:
                         continue
                     last_seq[pid] = seq_num
-
                     dx = int(packet[2])
                     dy = int(packet[3])
                     players[pid]["x"] += dx
@@ -98,8 +90,7 @@ def handle_packets():
                     server.sendto(pong, addr)
 
         except Exception as e:
-            print("Malformed packet ignored", e)
-
+            print("Malformed packet ignored:", e)
 
 def broadcast_state():
     while True:
@@ -110,7 +101,6 @@ def broadcast_state():
                 if key:
                     packet = encode_state(players, key)
                     server.sendto(packet, addr)
-
 
 def cleanup_clients():
     while True:
@@ -126,8 +116,6 @@ def cleanup_clients():
                 last_seen.pop(addr)
                 print(f"Client {pid} removed due to timeout")
 
-
-# Start threads
 threading.Thread(target=handle_packets, daemon=True).start()
 threading.Thread(target=broadcast_state, daemon=True).start()
 threading.Thread(target=ssl_handshake_server, daemon=True).start()

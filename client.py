@@ -14,6 +14,7 @@ latency = 0
 last_latency = None
 jitter = 0
 seq = 0
+pid = None  # <- store your assigned pid
 
 pygame.init()
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -29,27 +30,19 @@ def ssl_handshake():
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
-
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         secure_sock = context.wrap_socket(s, server_hostname=SERVER_IP)
         secure_sock.connect((SERVER_IP, HANDSHAKE_PORT))
-        session_key = secure_sock.recv(1024).decode()
-        SECURITY_KEY = session_key
+        SECURITY_KEY = secure_sock.recv(1024).decode()
         print(f"SSL handshake done, session key: {SECURITY_KEY}")
-
-        # Add our own player immediately so we can see it before STATE arrives
-        with lock:
-            players["1"] = {"x": 100, "y": 100, "r": 255, "g": 0, "b": 0}
-
     except ssl.SSLError as e:
         print(f"SSL handshake failed: {e}")
     finally:
         s.close()
 
-
 def receive_loop():
-    global latency, players, last_latency, jitter
+    global latency, players, last_latency, jitter, pid
     while True:
         data, _ = sock.recvfrom(4096)
         if not simulate_network():
@@ -61,39 +54,38 @@ def receive_loop():
             ptype = packet[0]
             if packet[-1] != SECURITY_KEY:
                 continue
-
             if ptype == "STATE":
                 new_players = {}
                 for p in packet[1:-1]:
-                    pid, x, y, r, g, b = p.split(",")
-                    new_players[pid] = {"x": int(x), "y": int(y), "r": int(r), "g": int(g), "b": int(b)}
+                    p_id, x, y, r, g, b = p.split(",")
+                    new_players[p_id] = {"x": int(x), "y": int(y), "r": int(r), "g": int(g), "b": int(b)}
                 with lock:
                     players = new_players
-
+                    # grab your assigned pid if not set
+                    if pid is None and str(len(players)) == "1":
+                        pid = next(iter(players))
             elif ptype == "PONG":
                 current_latency = (time.time() - float(packet[1])) * 1000
                 if last_latency is not None:
                     jitter = abs(current_latency - last_latency)
                 last_latency = current_latency
                 latency = current_latency
-
-        except Exception as e:
-            print("Bad packet", e)
-
+        except:
+            print("Bad packet")
 
 def send_move(dx, dy):
     global seq
-    packet = encode_move("0", dx, dy, seq, SECURITY_KEY)
+    if pid is None:
+        return
+    packet = encode_move(pid, dx, dy, seq, SECURITY_KEY)
     seq += 1
     sock.sendto(packet, server_addr)
-
 
 def ping_server():
     while True:
         packet = encode_ping(time.time(), SECURITY_KEY)
         sock.sendto(packet, server_addr)
         time.sleep(1)
-
 
 threading.Thread(target=receive_loop, daemon=True).start()
 threading.Thread(target=ping_server, daemon=True).start()
@@ -103,8 +95,7 @@ running = True
 clock = pygame.time.Clock()
 
 while running:
-    dx = 0
-    dy = 0
+    dx = dy = 0
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -123,9 +114,9 @@ while running:
 
     screen.fill((30, 30, 30))
     with lock:
-        for pid, p in players.items():
+        for p_id, p in players.items():
             pygame.draw.rect(screen, (p["r"], p["g"], p["b"]), (p["x"], p["y"], PLAYER_SIZE, PLAYER_SIZE))
-            text = font.render(pid, True, (255, 255, 255))
+            text = font.render(p_id, True, (255, 255, 255))
             screen.blit(text, (p["x"], p["y"] - 15))
 
     latency_text = font.render(f"Latency: {int(latency)} ms | Jitter: {int(jitter)} ms", True, (255, 255, 255))
