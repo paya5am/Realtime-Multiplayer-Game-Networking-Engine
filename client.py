@@ -29,15 +29,13 @@ def ssl_handshake():
     global SECURITY_KEY
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
-
-    context.set_ciphers("AES128-SHA") #must be identical to server
+    context.verify_mode = ssl.CERT_NONE  # accept server cert without validation
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         secure_sock = context.wrap_socket(s, server_hostname=SERVER_IP)
         secure_sock.connect((SERVER_IP, HANDSHAKE_PORT))
-        session_key = secure_sock.recv(1024).decode()
+        session_key = secure_sock.recv(1024).decode()  # receive session key
         SECURITY_KEY = session_key
         print(f"SSL handshake done, session key: {SECURITY_KEY}")
     except ssl.SSLError as e:

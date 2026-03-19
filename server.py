@@ -23,14 +23,18 @@ COLORS = [
     (255, 255, 0), (255, 0, 255), (0, 255, 255)
 ]
 
+import ssl, socket, secrets
+
+session_keys = {}  # keep track of client session keys
+
 def ssl_handshake_server():
+    # Create SSL context for server
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(certfile="server.pem", keyfile="server.key")
     context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE
+    context.verify_mode = ssl.CERT_NONE  # client won’t verify
 
-    # Force a shared cipher that works without certs
-    context.set_ciphers("AES128-SHA") 
-
+    # TCP socket for handshake
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((SERVER_IP, HANDSHAKE_PORT))
     s.listen(5)
@@ -40,10 +44,10 @@ def ssl_handshake_server():
         conn, addr = s.accept()
         try:
             secure_conn = context.wrap_socket(conn, server_side=True)
-            session_key = secrets.token_hex(16)
+            session_key = secrets.token_hex(16)  # generate unique session key
             session_keys[addr] = session_key
             print(f"Secure handshake with {addr}, session key: {session_key}")
-            secure_conn.send(session_key.encode())
+            secure_conn.send(session_key.encode())  # send key to client
         except ssl.SSLError as e:
             print(f"SSL handshake failed with {addr}: {e}")
         finally:
