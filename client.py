@@ -27,17 +27,23 @@ lock = threading.Lock()
 
 def ssl_handshake():
     global SECURITY_KEY
-    context = ssl.create_default_context()
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+
+    context.set_ciphers("AES128-SHA") #must be identical to server
+
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    secure_sock = context.wrap_socket(s, server_hostname=SERVER_IP)
     try:
+        secure_sock = context.wrap_socket(s, server_hostname=SERVER_IP)
         secure_sock.connect((SERVER_IP, HANDSHAKE_PORT))
         session_key = secure_sock.recv(1024).decode()
         SECURITY_KEY = session_key
         print(f"SSL handshake done, session key: {SECURITY_KEY}")
-    except:
-        print("SSL handshake failed")
-    secure_sock.close()
+    except ssl.SSLError as e:
+        print(f"SSL handshake failed: {e}")
+    finally:
+        s.close()
 
 def receive_loop():
     global latency, players, last_latency, jitter

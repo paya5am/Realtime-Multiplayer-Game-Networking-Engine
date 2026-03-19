@@ -24,9 +24,12 @@ COLORS = [
 ]
 
 def ssl_handshake_server():
-    context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.check_hostname = False
     context.verify_mode = ssl.CERT_NONE
+
+    # Force a shared cipher that works without certs
+    context.set_ciphers("AES128-SHA") 
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((SERVER_IP, HANDSHAKE_PORT))
@@ -35,12 +38,16 @@ def ssl_handshake_server():
 
     while True:
         conn, addr = s.accept()
-        secure_conn = context.wrap_socket(conn, server_side=True)
-        session_key = secrets.token_hex(16)
-        session_keys[addr] = session_key
-        print(f"Secure handshake with {addr}, session key: {session_key}")
-        secure_conn.send(session_key.encode())
-        secure_conn.close()
+        try:
+            secure_conn = context.wrap_socket(conn, server_side=True)
+            session_key = secrets.token_hex(16)
+            session_keys[addr] = session_key
+            print(f"Secure handshake with {addr}, session key: {session_key}")
+            secure_conn.send(session_key.encode())
+        except ssl.SSLError as e:
+            print(f"SSL handshake failed with {addr}: {e}")
+        finally:
+            conn.close()
 
 def handle_packets():
     while True:
