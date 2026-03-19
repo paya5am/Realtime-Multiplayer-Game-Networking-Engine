@@ -3,7 +3,6 @@ import threading
 import time
 import pygame
 import ssl  
-
 from config import *
 from shared import *
 
@@ -29,19 +28,25 @@ def ssl_handshake():
     global SECURITY_KEY
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     context.check_hostname = False
-    context.verify_mode = ssl.CERT_NONE  # accept server cert without validation
+    context.verify_mode = ssl.CERT_NONE
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         secure_sock = context.wrap_socket(s, server_hostname=SERVER_IP)
         secure_sock.connect((SERVER_IP, HANDSHAKE_PORT))
-        session_key = secure_sock.recv(1024).decode()  # receive session key
+        session_key = secure_sock.recv(1024).decode()
         SECURITY_KEY = session_key
         print(f"SSL handshake done, session key: {SECURITY_KEY}")
+
+        # Add our own player immediately so we can see it before STATE arrives
+        with lock:
+            players["1"] = {"x": 100, "y": 100, "r": 255, "g": 0, "b": 0}
+
     except ssl.SSLError as e:
         print(f"SSL handshake failed: {e}")
     finally:
         s.close()
+
 
 def receive_loop():
     global latency, players, last_latency, jitter
@@ -72,8 +77,9 @@ def receive_loop():
                 last_latency = current_latency
                 latency = current_latency
 
-        except:
-            print("Bad packet")
+        except Exception as e:
+            print("Bad packet", e)
+
 
 def send_move(dx, dy):
     global seq
@@ -81,11 +87,13 @@ def send_move(dx, dy):
     seq += 1
     sock.sendto(packet, server_addr)
 
+
 def ping_server():
     while True:
         packet = encode_ping(time.time(), SECURITY_KEY)
         sock.sendto(packet, server_addr)
         time.sleep(1)
+
 
 threading.Thread(target=receive_loop, daemon=True).start()
 threading.Thread(target=ping_server, daemon=True).start()
