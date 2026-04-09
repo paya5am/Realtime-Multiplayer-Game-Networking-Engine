@@ -1,4 +1,3 @@
-
 import random
 import time
 from config import PACKET_LOSS_SIMULATION, LATENCY_SIMULATION, JITTER_SIMULATION
@@ -6,18 +5,24 @@ from config import PACKET_LOSS_SIMULATION, LATENCY_SIMULATION, JITTER_SIMULATION
 def encode_move(pid, dx, dy, seq, key):
     return f"MOVE|{pid}|{dx}|{dy}|{seq}|{key}".encode()
 
-def encode_state(players, key):
+def encode_shoot(pid, dx, dy, seq, key):
+    return f"SHOOT|{pid}|{dx}|{dy}|{seq}|{key}".encode()
+
+def encode_state(players, bullets, key):
     parts = ["STATE"]
     for pid, p in players.items():
         parts.append(f"{pid},{p['x']},{p['y']},{p['r']},{p['g']},{p['b']}")
+    parts.append("BULLETS")
+    for b in bullets:
+        parts.append(f"{b['x']},{b['y']}")
     parts.append(key)
     return "|".join(parts).encode()
 
-def encode_ping(ts, key):
-    return f"PING|{ts}|{key}".encode()
+def encode_ping(seq, ts, key):
+    return f"PING|{seq}|{ts}|{key}".encode()
 
-def encode_pong(ts, key):
-    return f"PONG|{ts}|{key}".encode()
+def encode_pong(seq, ts, key):
+    return f"PONG|{seq}|{ts}|{key}".encode()
 
 def decode_packet(data):
     try:
@@ -34,9 +39,3 @@ def simulate_network():
         delay = max(0, base + jitter)
         time.sleep(delay)
     return True
-
-def calculate_jitter(latencies): 
-    if len(latencies) < 2:
-        return 0
-    diffs = [abs(latencies[i] - latencies[i - 1]) for i in range(1, len(latencies))]
-    return sum(diffs) / len(diffs)
