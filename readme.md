@@ -4,6 +4,7 @@
 
 This project demonstrates a **basic real-time multiplayer game networking system using UDP sockets in Python**.
 A central server maintains the positions of all players, while multiple clients connect to it and send movement commands.
+TCP Handshake is estabilished first between server and clients, after which UDP is used to communicate packets as well as positions.
 
 Each client controls a **player square in a simple pygame window**, and the server synchronizes player positions so that all clients can see other players moving in real time.
 
@@ -72,13 +73,19 @@ Q  - Quit
 
 Server Start
 
+
 <img width="616" height="114" alt="image" src="https://github.com/user-attachments/assets/2f83830c-9248-4a4a-b740-d51fdb82b195" />
+
 
 Client Initialization
 
-<img width="1595" height="635" alt="image" src="https://github.com/user-attachments/assets/d20931a6-aac2-4704-93a9-755717128975" />
+
+<img width="1600" height="634" alt="image" src="https://github.com/user-attachments/assets/1247fce8-b2c1-40ca-aa45-b3dd2776d76b" />
+
+
 
 Server Registering Clients
+
 
 <img width="610" height="178" alt="image" src="https://github.com/user-attachments/assets/9a02cbfe-668e-492b-81e8-a1453348a16a" />
 
@@ -87,7 +94,7 @@ Server Registering Clients
 ## Notes
 
 * The system uses **UDP socket communication** for low-latency updates.
-* RFC 3550 is used to calculate jitter values, and latency using exponential weighted moving average.
+* **RFC 3550** is used to calculate jitter values, and latency using exponential weighted moving average.
 * The server handles **player registration, state synchronization and broadcasting client positions to each other**.
 * Clients send movement commands and render the updated game state.
 * Different jitter and latency values can be used to effectively check performance of game under different network conditions on client side.
