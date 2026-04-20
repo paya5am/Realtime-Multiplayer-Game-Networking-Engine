@@ -36,7 +36,7 @@ python server.py
 
 ### 2. Run Clients
 
-Open one or more terminals and start clients:
+Open one or more terminals and start clients: ( ensure server ip address is present in config.py file ) 
 
 ```
 python client.py
@@ -53,6 +53,7 @@ W  - Move Up
 A  - Move Left
 S  - Move Down
 D  - Move Right
+SPACE - Shoot Bullet
 Q  - Quit
 ```
 
@@ -67,8 +68,26 @@ Q  - Quit
 
 ---
 
+## Screenshots
+
+Server Start
+
+<img width="616" height="114" alt="image" src="https://github.com/user-attachments/assets/2f83830c-9248-4a4a-b740-d51fdb82b195" />
+
+Client Initialization
+
+<img width="1595" height="635" alt="image" src="https://github.com/user-attachments/assets/d20931a6-aac2-4704-93a9-755717128975" />
+
+Server Registering Clients
+
+<img width="610" height="178" alt="image" src="https://github.com/user-attachments/assets/9a02cbfe-668e-492b-81e8-a1453348a16a" />
+
+
+
 ## Notes
 
 * The system uses **UDP socket communication** for low-latency updates.
-* The server handles **player registration and state synchronization**.
+* RFC 3550 is used to calculate jitter values, and latency using exponential weighted moving average.
+* The server handles **player registration, state synchronization and broadcasting client positions to each other**.
 * Clients send movement commands and render the updated game state.
+* Different jitter and latency values can be used to effectively check performance of game under different network conditions on client side.
